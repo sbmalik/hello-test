@@ -6,11 +6,11 @@ from PyQt6.QtCore import Qt
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Truth")
+        self.setWindowTitle("Hello World")
         self.setFixedSize(300, 150)
 
         # Create and center the label
-        label = QLabel("I like you idiot girl. A gift for you 🍫!!!", self)
+        label = QLabel("Hello World", self)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setCentralWidget(label)
 
