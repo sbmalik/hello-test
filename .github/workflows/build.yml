@@ -1,10 +1,27 @@
-name: Build Windows Executable
+name: Build Cross-Platform Executables
 
-on: [push]
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Continue with other builds even if one fails
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -12,17 +29,76 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+          cache: "pip" # Caches pip dependencies
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller PyQt6
 
-      - name: Build executable
-        run: pyinstaller --onefile --windowed main.py
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-qt6
 
-      - name: Upload artifact
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Build executable
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+          else
+            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+          fi
+        shell: bash
+
+      - name: Create distribution package
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cd dist
+            7z a -tzip ../HelloWorld-Windows-${{ steps.get_version.outputs.version }}.zip *
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cd dist
+            zip -r ../HelloWorld-MacOS-${{ steps.get_version.outputs.version }}.zip *
+          else
+            cd dist
+            zip -r ../HelloWorld-Linux-${{ steps.get_version.outputs.version }}.zip *
+          fi
+        shell: bash
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: HelloWorld-Windows
-          path: dist/*.exe
+          name: HelloWorld-${{ matrix.os }}-${{ steps.get_version.outputs.version }}
+          path: HelloWorld-*-${{ steps.get_version.outputs.version }}.zip
+          retention-days: 5
+
+  # Create GitHub Release when a tag is pushed
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            **/*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
