@@ -55,11 +55,11 @@ jobs:
       - name: Build executable
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+            pyinstaller --onefile --windowed --clean --name HelloWorld main.py
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+            pyinstaller --onefile --windowed --clean --name HelloWorld main.py
           else
-            pyinstaller --onefile --windowed --clean --name HelloWorld hello_world.py
+            pyinstaller --onefile --windowed --clean --name HelloWorld main.py
           fi
         shell: bash
 
